@@ -1,0 +1,175 @@
+USE moviego;
+
+CREATE TABLE IF NOT EXISTS tbl_user (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    email VARCHAR(150) NOT NULL UNIQUE,
+    password VARCHAR(255) NOT NULL,
+    image VARCHAR(255),
+    status ENUM('Active', 'Inactive') DEFAULT 'Active',
+    create_user VARCHAR(150),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    update_user VARCHAR(100),
+    updated_at TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS tbl_movie (
+    movie_id INT AUTO_INCREMENT PRIMARY KEY,
+    title VARCHAR(255) NOT NULL,
+    genre VARCHAR(255),
+    duration VARCHAR(20),
+    rating ENUM('G', 'PG', 'PG-13', 'R', 'NC-17'),
+    synopsis TEXT,
+    poster_image VARCHAR(255),
+    background_image VARCHAR(255),
+    release_date DATE,
+    release_status ENUM('Now Playing', 'Upcoming') DEFAULT 'Upcoming',
+    create_user VARCHAR(150),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    update_user VARCHAR(100),
+    updated_at TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+    status ENUM('Active', 'Inactive') DEFAULT 'Active'
+);
+
+CREATE TABLE IF NOT EXISTS tbl_cinema (
+    cinema_id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    address TEXT,
+    city VARCHAR(100),
+    state VARCHAR(100),
+    zip_code VARCHAR(20),
+    longitude DECIMAL(10, 7),
+    latitude DECIMAL(10, 7),
+    image VARCHAR(255),
+    create_user VARCHAR(150),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    update_user VARCHAR(100),
+    updated_at TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+    status ENUM('Active', 'Inactive') DEFAULT 'Active'
+);
+
+CREATE TABLE IF NOT EXISTS tbl_cinema_review (
+    review_id INT AUTO_INCREMENT PRIMARY KEY,
+    cinema_id INT NOT NULL,
+    user_id INT NOT NULL,
+    rating INT CHECK (rating BETWEEN 1 AND 5),
+    comment TEXT,
+    create_user VARCHAR(150) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    update_user VARCHAR(100) NULL,
+    updated_at TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+    status ENUM('Active', 'Inactive') DEFAULT 'Active',
+    FOREIGN KEY (cinema_id) REFERENCES tbl_cinema(cinema_id),
+    FOREIGN KEY (user_id) REFERENCES tbl_user(id)
+);
+
+CREATE TABLE IF NOT EXISTS tbl_screen (
+    screen_id INT AUTO_INCREMENT PRIMARY KEY,
+    cinema_id INT NOT NULL,
+    screen_name VARCHAR(100) NOT NULL,
+    total_seats INT NOT NULL,
+    screen_type VARCHAR(50),
+    create_user VARCHAR(150),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    update_user VARCHAR(100),
+    updated_at TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+    status ENUM('Active', 'Inactive') DEFAULT 'Active',
+    FOREIGN KEY (cinema_id) REFERENCES tbl_cinema(cinema_id)
+);
+
+CREATE TABLE IF NOT EXISTS tbl_seat_layout (
+    seat_id INT AUTO_INCREMENT PRIMARY KEY,
+    screen_id INT NOT NULL,
+    seat_label VARCHAR(10) NOT NULL,
+    create_user VARCHAR(150),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    update_user VARCHAR(100),
+    updated_at TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+    status ENUM('Active', 'Inactive') DEFAULT 'Active',
+    FOREIGN KEY (screen_id) REFERENCES tbl_screen(screen_id)
+);
+
+CREATE TABLE IF NOT EXISTS tbl_showtime (
+    showtime_id INT AUTO_INCREMENT PRIMARY KEY,
+    movie_id INT NOT NULL,
+    screen_id INT NOT NULL,
+    show_date DATE NOT NULL,
+    show_time TIME NOT NULL,
+    price DECIMAL(10,2) NOT NULL,
+    create_user VARCHAR(150),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    update_user VARCHAR(100),
+    updated_at TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+    status ENUM('Active', 'Inactive') DEFAULT 'Active',
+    FOREIGN KEY (movie_id) REFERENCES tbl_movie(movie_id),
+    FOREIGN KEY (screen_id) REFERENCES tbl_screen(screen_id)
+);
+
+CREATE TABLE IF NOT EXISTS tbl_booking (
+    booking_id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    showtime_id INT NOT NULL,
+    booking_status ENUM('Booked', 'Cancelled') DEFAULT 'Booked',
+    create_user VARCHAR(150),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    update_user VARCHAR(100),
+    updated_at TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+    status ENUM('Active', 'Inactive') DEFAULT 'Active',
+    FOREIGN KEY (user_id) REFERENCES tbl_user(id),
+    FOREIGN KEY (showtime_id) REFERENCES tbl_showtime(showtime_id)
+);
+
+CREATE TABLE IF NOT EXISTS tbl_booking_seat (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    booking_id INT NOT NULL,
+    seat_id INT NOT NULL,
+    showtime_id INT NOT NULL,
+    is_cancelled BOOLEAN DEFAULT FALSE,
+    FOREIGN KEY (booking_id) REFERENCES tbl_booking(booking_id),
+    FOREIGN KEY (seat_id) REFERENCES tbl_seat_layout(seat_id),
+    FOREIGN KEY (showtime_id) REFERENCES tbl_showtime(showtime_id)
+);
+
+CREATE TABLE IF NOT EXISTS tbl_order_summary (
+    order_id INT AUTO_INCREMENT PRIMARY KEY,
+    booking_id INT NOT NULL,
+    payment_method ENUM('Cash', 'Card', 'UPI') NOT NULL,
+    total_amount DECIMAL(10,2) NOT NULL,
+    discount DECIMAL(10,2) DEFAULT 0.00,
+    final_amount DECIMAL(10,2) NOT NULL,
+    create_user VARCHAR(150),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    update_user VARCHAR(100),
+    updated_at TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+    status ENUM('Active', 'Inactive') DEFAULT 'Active',
+    FOREIGN KEY (booking_id) REFERENCES tbl_booking(booking_id)
+);
+
+CREATE TABLE tbl_news (
+    news_id INT AUTO_INCREMENT PRIMARY KEY,
+    image VARCHAR(255) NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    description TEXT NOT NULL,
+    create_user VARCHAR(150) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    update_user VARCHAR(100),
+    updated_at TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+    status ENUM('Active', 'Inactive') DEFAULT 'Active'
+);
+
+CREATE INDEX idx_email ON tbl_user(email);
+CREATE INDEX idx_status ON tbl_user(status);
+CREATE INDEX idx_movie_release_status ON tbl_movie(release_status);
+CREATE INDEX idx_movie_status ON tbl_movie(status);
+CREATE INDEX idx_movie_release_date ON tbl_movie(release_date);
+CREATE INDEX idx_screen_cinema_id ON tbl_screen(cinema_id);
+CREATE INDEX idx_seat_layout_screen_id ON tbl_seat_layout(screen_id);
+CREATE INDEX idx_showtime_movie_id ON tbl_showtime(movie_id);
+CREATE INDEX idx_showtime_screen_id ON tbl_showtime(screen_id);
+CREATE INDEX idx_showtime_date_time ON tbl_showtime(show_date, show_time);
+CREATE INDEX idx_booking_user_id ON tbl_booking(user_id);
+CREATE INDEX idx_booking_showtime_id ON tbl_booking(showtime_id);
+CREATE INDEX idx_booking_seat_booking_id ON tbl_booking_seat(booking_id);
+CREATE INDEX idx_booking_seat_seat_id ON tbl_booking_seat(seat_id);
+CREATE INDEX idx_booking_seat_showtime_id ON tbl_booking_seat(showtime_id);
+CREATE INDEX idx_order_summary_booking_id ON tbl_order_summary(booking_id);

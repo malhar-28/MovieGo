@@ -1,0 +1,93 @@
+
+
+
+
+.btn-seat {
+  width: 40px;
+  height: 40px;
+  margin: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: bold;
+  padding: 0;
+  text-align: center;
+  box-sizing: border-box;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.btn-outline-secondary {
+  background-color: #ffffff !important;
+  color: #6c757d !important;
+  border: 1px solid #6c757d !important;
+}
+
+.btn-outline-secondary:hover:not(:disabled) {
+  background-color: #e2e6ea !important;
+  border-color: #545b62 !important;
+  color: #343a40 !important;
+}
+
+.btn-primary {
+  background-color: #007bff !important;
+  color: white !important;
+  border: 1px solid #007bff !important;
+}
+
+.btn-danger {
+  background-color: #dc3545 !important;
+  color: white !important;
+  border: 1px solid #dc3545 !important;
+  cursor: not-allowed !important;
+  opacity: 0.7 !important;
+}
+
+
+/* Also apply disabled styling to generic disabled buttons if they use Bootstrap's disabled class */
+.btn-danger.disabled,
+.btn.disabled,
+button:disabled { /* Catch-all for disabled buttons */
+ cursor: not-allowed !important;
+ opacity: 0.6 !important; /* Consistent dimming for all disabled states */
+ pointer-events: none !important; /* Ensure no click events fire */
+}
+
+
+/* Keep legend box styles for consistency with visual representation */
+.seat-legend-box {
+ display: inline-block;
+ width: 20px;
+ height: 20px;
+ margin-right: 5px;
+ border: 1px solid #dee2e6;
+}
+
+.bg-secondary {
+ background-color: #6c757d !important; /* For the legend box, solid grey */
+}
+
+.bg-primary {
+ background-color: #007bff !important; /* For the legend box, solid blue */
+}
+
+.bg-danger {
+ background-color: #dc3545 !important; /* For the legend box, solid red */
+}
+
+/* Optional: Add a subtle shadow or transition for better UX */
+.btn-seat {
+ transition: all 0.2s ease-in-out;
+}
+.btn-seat:not(:disabled):hover {
+ transform: translateY(-1px);
+ box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+}
+
+
+.btn-seat.booked {
+  background-color: #dc3545 !important; /* Red color for booked seats */
+  cursor: not-allowed;
+}

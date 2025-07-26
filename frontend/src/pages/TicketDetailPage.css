@@ -1,0 +1,119 @@
+/* src/pages/TicketDetailPage.css */
+
+.ticket-wrapper {
+  background-color: #0a1e42;
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.ticket-card {
+  width: 90%;
+  max-width: 320px;
+  background-color: white;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+}
+
+.ticket-header {
+  background-color: #0a1e42;
+  color: white;
+  text-align: center;
+  padding: 1rem;
+  font-weight: 600;
+  font-size: 1.2rem;
+}
+
+.ticket-body {
+  padding: 1rem;
+  background-color: #f9f9f9;
+}
+
+.ticket-movie {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.ticket-poster {
+  width: 55px;
+  height: 75px;
+  object-fit: cover;
+  border-radius: 8px;
+}
+
+.order-id {
+  color: #007bff;
+  font-size: 0.75rem;
+  margin-bottom: 0.25rem;
+}
+
+.movie-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.theatre {
+  font-size: 0.75rem;
+  color: gray;
+}
+
+.ticket-info {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 1rem;
+  font-size: 0.85rem;
+}
+
+.label {
+  font-size: 0.75rem;
+  color: #666;
+  margin-bottom: 0.25rem;
+}
+
+.seats {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.seat-tag {
+  background-color: #007bff;
+  color: white;
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 0.75rem;
+}
+
+.ticket-info.bottom {
+  margin-top: 1.5rem;
+  align-items: center;
+}
+
+.qr-code {
+  background-color: white;
+  padding: 6px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+}
+
+.back-button {
+  width: 100%;
+  background-color: #3165ff;
+  color: white;
+  border: none;
+  padding: 0.75rem;
+  font-weight: bold;
+  border-bottom-left-radius: 16px;
+  border-bottom-right-radius: 16px;
+  cursor: pointer;
+  transition: background 0.3s;
+}
+
+.back-button:hover {
+  background-color: #254edf;
+}
