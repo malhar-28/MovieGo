@@ -5,7 +5,7 @@ const { sendEmail } = require('../utils/emailService');
 const { generateOtpEmailContent } = require('../utils/emailTemplates');
 const path = require('path');
 const fs = require('fs');
-
+const moment = require('moment');
 const otpStore = new Map(); // In-memory OTP store (replace with Redis in prod)
 
 
@@ -43,28 +43,51 @@ const generateRegistrationEmailContent = (user) => {
 };
 
 
+
 exports.register = async (req, res) => {
   try {
-    const { name, email, password } = req.body;
-    const create_user = req.user?.email || email; // fallback to email if public route
+    const { name, email, mobile, password } = req.body;
+
+    // Basic validations
+    if (!name || !email || !mobile || !password) {
+      return res.status(400).json({ error: 'All fields are required.' });
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const contactRegex = /^[6-9]\d{9}$/;
+
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ error: 'Invalid email format.' });
+    }
+
+    if (!contactRegex.test(mobile)) {
+      return res.status(400).json({ error: 'Invalid contact number. Must be a valid Indian number.' });
+    }
+
     const hashedPassword = await bcrypt.hash(password, 10);
-    const image = req.file?.filename || null;
 
-    await pool.execute('CALL RegisterUser(?, ?, ?, ?, ?)', [name, email, hashedPassword, image, create_user]);
+    await pool.execute('CALL RegisterUser(?, ?, ?, ?, ?)', [
+      name,
+      email,
+      mobile,
+      hashedPassword,
+      email // or any other value you want for create_user
+    ]);
 
-// Send registration email
-try {
-  const registrationEmailHtml = generateRegistrationEmailContent({ name, email });
-  await sendEmail(email, 'Welcome to MovieGo! Your Registration is Successful', registrationEmailHtml);
-  console.log(`Registration email sent to ${email}`);
-} catch (emailErr) {
-  console.error('Error sending registration email:', emailErr);
-}
 
-res.json({ message: 'User registered successfully' });
+    try {
+      const registrationEmailHtml = generateRegistrationEmailContent({ name, email });
+      await sendEmail(email, 'Welcome to MovieGo! Your Registration is Successful', registrationEmailHtml);
+      console.log(`Registration email sent to ${email}`);
+    } catch (emailErr) {
+      console.error('Error sending registration email:', emailErr);
+    }
+
+    res.json({ message: 'User registered successfully' });
 
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error(err);
+    res.status(500).json({ error: 'Registration failed. Please try again later.' });
   }
 };
 
@@ -80,7 +103,7 @@ exports.login = async (req, res) => {
     const match = await bcrypt.compare(password, user.password);
     if (!match) return res.status(401).json({ message: 'Invalid credentials' });
     const token = generateToken({ id: user.id, email: user.email });
-    res.json({ token, email:user.email });
+    res.json({ token, email: user.email });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -99,7 +122,7 @@ exports.login = async (req, res) => {
 //         if (err) console.error('Error deleting old image:', err);
 //       });
 //     }
-    
+
 
 //     await pool.execute('CALL UpdateUser(?, ?, ?, ?)', [
 //       id,
@@ -108,7 +131,7 @@ exports.login = async (req, res) => {
 //       update_user
 //     ]);
 
-    
+
 // const [updatedRows] = await pool.execute('CALL GetUserById(?)', [id]);
 // const updatedUser = updatedRows[0][0];
 // res.json({ message: 'User updated successfully', user: updatedUser });
@@ -118,49 +141,96 @@ exports.login = async (req, res) => {
 //   }
 // };
 
+
 exports.updateUser = async (req, res) => {
   try {
-    console.log('----- updateUser function started -----');
-    console.log('Incoming req.file (from Multer):', req.file); // <-- ADD THIS
-    console.log('Incoming req.body:', req.body); // <-- ADD THIS
 
-    const { name } = req.body;
-    const image = req.file?.filename || null; // This gets the new filename from multer
+    const {
+      name,
+      mobile,
+      dob,
+      gender,
+      city,
+      pincode
+    } = req.body;
+
+    const image = req.file?.filename || null;
     const id = req.user.id;
     const update_user = req.user.email;
 
-    console.log('Filename extracted for DB update:', image); // <-- ADD THIS
-    console.log('User ID for update:', id); // <-- ADD THIS
+    // --- VALIDATION SECTION ---
+    const errors = [];
 
-    // This block attempts to delete the old image
+    // Name: optional, string, max 100 chars
+    if (name && (typeof name !== 'string' || name.trim().length > 100)) {
+      errors.push('Name must be a string and max 100 characters.');
+    }
+
+    // Mobile: optional, must be a valid 10-digit Indian number
+    if (mobile && !/^[6-9]\d{9}$/.test(mobile)) {
+      errors.push('Mobile number must be a valid 10-digit Indian number.');
+    }
+
+    // DOB: optional, must be valid and in the past
+    if (dob && (!moment(dob, 'YYYY-MM-DD', true).isValid() || moment(dob).isAfter(moment()))) {
+      errors.push('Date of birth must be a valid date in the past (YYYY-MM-DD).');
+    }
+
+    // Gender: optional, must be one of the allowed values
+    const validGenders = ['Male', 'Female', 'Other'];
+    if (gender && !validGenders.includes(gender)) {
+      errors.push('Gender must be Male, Female, or Other.');
+    }
+
+    // City: optional, string, max 100 chars
+    if (city && (typeof city !== 'string' || city.trim().length > 100)) {
+      errors.push('City must be a string and max 100 characters.');
+    }
+
+    // Pincode: optional, must be 6 digits
+    if (pincode && !/^\d{6}$/.test(pincode)) {
+      errors.push('Pincode must be exactly 6 digits.');
+    }
+
+    // If validation fails, return errors
+    if (errors.length > 0) {
+      return res.status(400).json({ message: 'Validation failed', errors });
+    }
+
+    // --- OPTIONAL: Sanitize inputs ---
+    const clean = (val) => (typeof val === 'string' ? val.trim() : val);
+
+    // Delete old image if new image uploaded
     if (req.file && req.user.image) {
       const oldImagePath = path.join(__dirname, '..', 'UserImage', req.user.image);
-      console.log('Attempting to delete old image:', oldImagePath); // <-- ADD THIS
       fs.unlink(oldImagePath, (err) => {
         if (err) console.error('Error deleting old image:', err);
       });
     }
 
     // Call the stored procedure to update the user
-    await pool.execute('CALL UpdateUser(?, ?, ?, ?)', [
+    await pool.execute('CALL UpdateUser(?, ?, ?, ?, ?, ?, ?, ?, ?)', [
       id,
-      name || null,
-      image, // This 'image' is the new filename
-      update_user
+      clean(name) || null,
+      image,
+      update_user,
+      clean(mobile) || null,
+      dob || null,
+      gender || null,
+      clean(city) || null,
+      clean(pincode) || null
     ]);
-    console.log('CALL UpdateUser executed with image value:', image); // <-- ADD THIS
 
-    // Retrieve the updated user from the database
+    // Fetch updated user data
     const [updatedRows] = await pool.execute('CALL GetUserById(?)', [id]);
-    const updatedUser = updatedRows[0][0]; // This is the user object from the DB
-    console.log('User data fetched after update (from DB):', updatedUser); // <-- ADD THIS
+    const updatedUser = updatedRows[0][0];
 
-    // Send the response with the updated user object
+    console.log('User data updated:', updatedUser);
+
     res.json({ message: 'User updated successfully', user: updatedUser });
-    console.log('----- updateUser function finished successfully -----');
 
   } catch (err) {
-    console.error('Error in updateUser:', err); // <-- MODIFIED FOR BETTER LOGGING
+    console.error('Error in updateUser:', err);
     res.status(500).json({ error: err.message });
   }
 };
