@@ -59,7 +59,7 @@ router.patch('/toggle-status', verifyAuth, showtimeController.toggleShowtimeStat
 router.post('/detail', showtimeController.getShowtimeById); // MODIFIED: Removed verifyAuth
 router.post('/filter', showtimeController.getShowtimesByMovieAndCinema); // MODIFIED: Removed verifyAuth
 router.get('/get-all', verifyAuth, showtimeController.getAllShowtimes); // admin access
-
+router.post('/showtime-by-city-cinema-date', showtimeController.getShowtimesByFilter);
 router.get('/booked-seats/:showtimeId', verifyAuth, showtimeController.getBookedSeatsForShowtime); // This route remains protected as it's part of seat selection
 
 router.post('/by-cinema', showtimeController.getShowtimesByCinemaId); // MODIFIED: Removed verifyAuth

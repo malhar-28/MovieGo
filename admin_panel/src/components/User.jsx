@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Eye, ToggleLeft, ToggleRight, Search, UserCheck, UserX, TrendingUp, Users } from 'lucide-react';
-
+import { Eye, ToggleLeft, ToggleRight, Search, UserCheck, UserX, TrendingUp, Users, Mail, Phone, Cake, PersonStanding, MapPin, CalendarPlus, CalendarClock, ShieldCheck } from 'lucide-react';
 // Utility function to format dates
 const formatDate = (dateString) => {
   if (!dateString) return 'N/A';
@@ -35,71 +34,93 @@ const BASE_URL = import.meta.env.VITE_BASE_URL;
 // Modal Component
 const UserDetailsModal = ({ user, onClose }) => {
   return (
-    <div className="fixed inset-0 bg-opacity-50 backdrop-blur-sm flex justify-center items-center z-50">
-      <div className="bg-white rounded-xl w-1/3 overflow-hidden shadow-2xl">
-        <div className="bg-gradient-to-r from-blue-600 to-blue-700 p-6 text-white">
-          <div className="flex justify-between items-center">
-            <h3 className="text-xl font-bold">User Details</h3>
-            <button
-              onClick={onClose}
-              className="text-blue-200 hover:text-white hover:bg-blue-800 rounded-full p-1 transition-all duration-200"
-            >
-              <span className="text-xl">×</span>
-            </button>
-          </div>
+    <div className="fixed inset-0  bg-opacity-50 backdrop-blur-sm flex justify-center items-center z-50 p-4">
+      <div className="bg-white rounded-2xl w-full max-w-2xl overflow-hidden shadow-2xl ">
+        
+        {/* Header */}
+        <div className="bg-gradient-to-r from-blue-600 to-blue-700 p-5 text-white flex justify-between items-center">
+          <h3 className="text-xl font-bold">User Profile</h3>
+          <button
+            onClick={onClose}
+            className="text-blue-200 hover:text-white hover:bg-blue-800 rounded-full p-1 transition-all"
+          >
+            <span className="text-2xl leading-none">&times;</span>
+          </button>
         </div>
-        <div className="p-6 space-y-6">
-          {/* User Avatar and Name */}
-          <div className="text-center">
+
+        <div className="p-8 space-y-8">
+          {/* --- Profile Header --- */}
+          <div className="flex flex-col sm:flex-row items-center space-y-4 sm:space-y-0 sm:space-x-6">
             {user.image ? (
               <img
-                className="h-24 w-24 rounded-full mx-auto object-cover ring-4 ring-blue-200 shadow-lg"
+                className="h-28 w-28 rounded-2xl object-cover ring-4 ring-blue-200 shadow-lg"
                 src={`${BASE_URL}/UserImage/${user.image}`}
                 alt={user.name}
               />
             ) : (
-              <div className="h-24 w-24 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 mx-auto flex items-center justify-center ring-4 ring-blue-200 shadow-lg">
-                <span className="text-2xl font-bold text-white">
+              <div className="h-28 w-28 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center ring-4 ring-blue-200 shadow-lg">
+                <span className="text-4xl font-bold text-white">
                   {user.name.charAt(0).toUpperCase()}
                 </span>
               </div>
             )}
-            <h4 className="mt-4 text-xl font-bold text-gray-900">{user.name}</h4>
-            <p className="text-blue-600 font-medium">{user.email}</p>
+            <div className="text-center sm:text-left">
+              <h4 className="text-2xl font-bold text-gray-900">{user.name}</h4>
+              <div className="flex items-center justify-center sm:justify-start mt-1 text-blue-600 font-medium">
+                <Mail className="w-4 h-4 mr-2" />
+                <span>{user.email}</span>
+              </div>
+            </div>
           </div>
 
-          {/* User Information */}
-          <div className="space-y-4">
-            <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-              <label className="block text-sm font-semibold text-blue-800 mb-2">Status</label>
-              <span className={`inline-flex px-3 py-1 text-sm font-bold rounded-full ${
-                user.status === 'Active'
-                  ? 'bg-green-100 text-green-800 ring-1 ring-green-200'
-                  : 'bg-red-100 text-red-800 ring-1 ring-red-200'
-              }`}>
-                {user.status}
-              </span>
+          {/* --- User Details Grid --- */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Contact & Personal Details */}
+            <InfoCard icon={Phone} label="Mobile Number" value={user.mobile || 'N/A'} />
+            <InfoCard icon={Cake} label="Date of Birth" value={user.dob ? new Date(user.dob).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : 'N/A'} />
+            <InfoCard icon={PersonStanding} label="Gender" value={user.gender || 'N/A'} />
+            <InfoCard icon={MapPin} label="Location" value={user.city && user.pincode ? `${user.city} - ${user.pincode}` : (user.city || 'N/A')} />
+            
+            {/* Account Information */}
+            <div className="bg-gray-50 p-4 rounded-lg flex items-center col-span-1 md:col-span-2">
+                <div className="p-2 bg-blue-100 text-blue-600 rounded-lg">
+                    <ShieldCheck className="w-6 h-6" />
+                </div>
+                <div className="ml-4">
+                    <p className="text-sm font-semibold text-gray-600">Account Status</p>
+                    <span className={`inline-flex px-3 py-1 mt-1 text-sm font-bold rounded-full ${
+                        user.status === 'Active'
+                        ? 'bg-green-100 text-green-800'
+                        : 'bg-red-100 text-red-800'
+                    }`}>
+                        {user.status}
+                    </span>
+                </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Created</label>
-                <p className="text-sm text-gray-900 font-medium">{user.create_user || 'N/A'}</p>
-                <p className="text-xs text-gray-600">{formatDate(user.created_at)}</p>
-              </div>
-
-              <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Last Updated</label>
-                <p className="text-sm text-gray-900 font-medium">{user.update_user || 'N/A'}</p>
-                <p className="text-xs text-gray-600">{formatDate(user.updated_at)}</p>
-              </div>
-            </div>
+            <InfoCard icon={CalendarPlus} label="Created By" value={user.create_user || 'N/A'} subValue={formatDate(user.created_at)} />
+            <InfoCard icon={CalendarClock} label="Last Updated By" value={user.update_user || 'N/A'} subValue={formatDate(user.updated_at)} />
           </div>
         </div>
       </div>
     </div>
   );
 };
+
+// Helper component for displaying info cards
+const InfoCard = ({ icon: Icon, label, value, subValue }) => (
+  <div className="bg-gray-50 p-4 rounded-lg flex items-start">
+    <div className="p-2 bg-blue-100 text-blue-600 rounded-lg mt-1">
+      <Icon className="w-5 h-5" />
+    </div>
+    <div className="ml-4">
+      <p className="text-sm font-semibold text-gray-600">{label}</p>
+      <p className="text-md font-medium text-gray-900">{value}</p>
+      {subValue && <p className="text-xs text-gray-500">{subValue}</p>}
+    </div>
+  </div>
+);
+
 
 const User = () => {
   const [users, setUsers] = useState([]);

@@ -496,6 +496,25 @@ exports.getAllShowtimes = async (req, res) => {
     }
 };
 
+exports.getShowtimesByFilter = async (req, res) => {
+    try {
+        const { movie_id, city, show_date } = req.body;
+
+        if (!movie_id || !city || !show_date) {
+            return res.status(400).json({ message: 'movie_id, city, and show_date are required.' });
+        }
+
+        const [rows] = await pool.query(
+            'CALL GetShowtimesByFilter(?, ?, ?)',
+            [movie_id, city, show_date]
+        );
+
+        res.json(rows[0]);
+    } catch (err) {
+        console.error('Error fetching showtimes by filter:', err);
+        res.status(500).json({ error: 'Failed to retrieve filtered showtimes: ' + err.message });
+    }
+};
 
 // Get Booked Seats for a Showtime
 exports.getBookedSeatsForShowtime = async (req, res) => {

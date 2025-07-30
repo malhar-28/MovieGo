@@ -314,6 +314,91 @@ const getBookingDetailsForUserBookings = async (bookingId, connection) => {
     return null;
 };
 
+exports.getUserBookingById = async (req, res) => {
+    let connection;
+    try {
+        connection = await pool.getConnection();
+        const user_id = req.user.id;
+        const bookingId = req.body.booking_id;
+
+        if (!bookingId) {
+            return res.status(400).json({ error: 'Booking ID is required in request body.' });
+        }
+
+        const [bookingResult] = await connection.execute('CALL GetBookingByBookingIdUserId(?, ?)', [bookingId, user_id]);
+        const bookingData = bookingResult[0]?.[0];
+
+        if (!bookingData) {
+            return res.status(404).json({ error: 'Booking not found or access denied.' });
+        }
+
+        const bookedSeats = JSON.parse(bookingData.booked_seats_details || '[]');
+        let totalCalculatedAmount = 0;
+
+        const seats = bookedSeats.map(seat => {
+            totalCalculatedAmount += parseFloat(seat.price || 0);
+            return {
+                seat_id: seat.seat_id,
+                seat_label: seat.seat_label,
+                seat_type: seat.seat_type,
+                is_cancelled: seat.is_cancelled,
+                price: parseFloat(seat.price || 0)
+            };
+        });
+
+        const showDateTime = moment(`${bookingData.show_date} ${bookingData.show_time}`, 'YYYY-MM-DD HH:mm:ss');
+        const hoursDifference = showDateTime.diff(moment(), 'hours');
+
+        const result = {
+            ...bookingData,
+            total_amount_calculated: totalCalculatedAmount.toFixed(2),
+            canCancel: hoursDifference > 1 && bookingData.booking_status === 'Confirmed',
+            seats: seats
+        };
+
+        res.json(result);
+
+    } catch (err) {
+        console.error('Error fetching booking by ID:', err);
+        res.status(500).json({ error: 'Failed to fetch booking.' });
+    } finally {
+        if (connection) connection.release();
+    }
+};
+
+
+
+
+exports.getUpcomingBookings = async (req, res) => {
+    let connection;
+    try {
+        connection = await pool.getConnection();
+        const user_id = req.user.id;
+
+        // Reuse the same stored procedure
+        const [rawBookingsResult] = await connection.execute('CALL GetBookingsByUserId(?)', [user_id]);
+        const rawBookings = rawBookingsResult[0];
+
+        const currentTime = moment(); // Current time for comparison
+        const upcomingBookings = [];
+
+        for (const booking of rawBookings) {
+            const showDate = moment(booking.show_date).format('YYYY-MM-DD');
+            const showDateTime = moment(`${showDate} ${booking.show_time}`, 'YYYY-MM-DD HH:mm:ss');
+
+            if (showDateTime.isAfter(currentTime)) {
+                upcomingBookings.push(booking);
+            }
+        }
+
+        res.json(upcomingBookings);
+    } catch (err) {
+        console.error('Error fetching upcoming bookings:', err);
+        res.status(500).json({ error: 'Failed to fetch upcoming bookings: ' + err.message });
+    } finally {
+        if (connection) connection.release();
+    }
+};
 
 // User: Get logged-in user's bookings (MODIFIED)
 // User: Get logged-in user's bookings (MODIFIED)
