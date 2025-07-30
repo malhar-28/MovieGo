@@ -1,5 +1,6 @@
 // File: MovieGo/backend/server.js
 // comment 2
+//Server.js
 const app = require('./app');
 
 const PORT = process.env.PORT || 5000;
