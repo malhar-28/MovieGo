@@ -7,6 +7,8 @@ const { verifyAuth } = require('../middleware/auth'); // Correct import: verifyA
 // User-side booking functionality
 router.post('/create', verifyAuth, bookingController.createBooking); // Create a new booking
 router.get('/my', verifyAuth, bookingController.getUserBookings); // Get bookings for the logged-in user
+router.post('/my/id', verifyAuth, bookingController.getUserBookingById);
+router.get('/my/upcoming', verifyAuth, bookingController.getUpcomingBookings);
 
 // Admin-side booking functionality
 router.get('/get-all', verifyAuth, bookingController.getAllBookings); // Get all bookings for admin
