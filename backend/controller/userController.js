@@ -8,11 +8,6 @@ const fs = require('fs');
 const moment = require('moment');
 const otpStore = new Map(); // In-memory OTP store (replace with Redis in prod)
 
-
-
-
-
-
 const generateRegistrationEmailContent = (user) => {
   const userName = user.name || 'User';
   const email = user.email;
@@ -66,15 +61,28 @@ exports.register = async (req, res) => {
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    await pool.execute('CALL RegisterUser(?, ?, ?, ?, ?)', [
+    // Register user using SP
+    const [result] = await pool.execute('CALL RegisterUser(?, ?, ?, ?, ?)', [
       name,
       email,
       mobile,
       hashedPassword,
-      email // or any other value you want for create_user
+      email // for create_user
     ]);
 
+    // Fetch registered user ID
+    const [userData] = await pool.execute('CALL GetUserByEmail(?)', [email]);
+    const user = userData[0][0];
+    if (!user) return res.status(500).json({ error: 'Failed to retrieve registered user.' });
 
+    // Generate token
+    const token = generateToken({ id: user.id, email: user.email });
+
+    // Fetch complete user details
+    const [details] = await pool.execute('CALL GetUserById(?)', [user.id]);
+    const userDetails = details[0][0];
+
+    // Send registration email (non-blocking)
     try {
       const registrationEmailHtml = generateRegistrationEmailContent({ name, email });
       await sendEmail(email, 'Welcome to MovieGo! Your Registration is Successful', registrationEmailHtml);
@@ -83,7 +91,15 @@ exports.register = async (req, res) => {
       console.error('Error sending registration email:', emailErr);
     }
 
-    res.json({ message: 'User registered successfully' });
+    // Send response
+    res.json({
+      token,
+      id: userDetails.id,
+      name: userDetails.name,
+      email: userDetails.email,
+      image: userDetails.image,
+      contact: userDetails.mobile
+    });
 
   } catch (err) {
     console.error(err);
@@ -94,20 +110,43 @@ exports.register = async (req, res) => {
 
 
 
+
 exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
+
+    // Step 1: Get user by email (for login)
     const [rows] = await pool.execute('CALL GetUserByEmail(?)', [email]);
     const user = rows[0][0];
     if (!user) return res.status(401).json({ message: 'Invalid credentials' });
+
+    // Step 2: Verify password
     const match = await bcrypt.compare(password, user.password);
     if (!match) return res.status(401).json({ message: 'Invalid credentials' });
+
+    // Step 3: Generate token
     const token = generateToken({ id: user.id, email: user.email });
-    res.json({ token, email: user.email });
+
+    // Step 4: Get full user details using GetUserById
+    const [userDetailRows] = await pool.execute('CALL GetUserById(?)', [user.id]);
+    const userDetails = userDetailRows[0][0];
+
+    // Step 5: Respond with required fields
+    res.json({
+      token,
+      id: userDetails.id,
+      name: userDetails.name,
+      email: userDetails.email,
+      image: userDetails.image,
+      contact: userDetails.mobile // assuming 'mobile' is the contact number
+    });
+
   } catch (err) {
+    console.error('Login error:', err);
     res.status(500).json({ error: err.message });
   }
 };
+
 
 // exports.updateUser = async (req, res) => {
 //   try {
