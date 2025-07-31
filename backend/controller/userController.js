@@ -39,6 +39,7 @@ const generateRegistrationEmailContent = (user) => {
 
 
 
+
 exports.register = async (req, res) => {
   try {
     const { name, email, mobile, password } = req.body;
@@ -59,30 +60,40 @@ exports.register = async (req, res) => {
       return res.status(400).json({ error: 'Invalid contact number. Must be a valid Indian number.' });
     }
 
+    // 🔍 Check for duplicate user using stored procedure
+    const [existingUserResult] = await pool.execute('CALL CheckUserExists(?, ?)', [email, mobile]);
+    const existingUser = existingUserResult[0];
+    if (existingUser.length > 0) {
+      return res.status(409).json({ error: 'User with this email or mobile already exists.' });
+    }
+
+    // Hash the password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Register user using SP
-    const [result] = await pool.execute('CALL RegisterUser(?, ?, ?, ?, ?)', [
+    // Register user using stored procedure
+    await pool.execute('CALL RegisterUser(?, ?, ?, ?, ?)', [
       name,
       email,
       mobile,
       hashedPassword,
-      email // for create_user
+      email // used as create_user
     ]);
 
-    // Fetch registered user ID
+    // Fetch user data using GetUserByEmail
     const [userData] = await pool.execute('CALL GetUserByEmail(?)', [email]);
     const user = userData[0][0];
-    if (!user) return res.status(500).json({ error: 'Failed to retrieve registered user.' });
+    if (!user) {
+      return res.status(500).json({ error: 'Failed to retrieve registered user.' });
+    }
 
-    // Generate token
+    // Generate JWT token
     const token = generateToken({ id: user.id, email: user.email });
 
-    // Fetch complete user details
+    // Get full user details
     const [details] = await pool.execute('CALL GetUserById(?)', [user.id]);
     const userDetails = details[0][0];
 
-    // Send registration email (non-blocking)
+    // Send registration email
     try {
       const registrationEmailHtml = generateRegistrationEmailContent({ name, email });
       await sendEmail(email, 'Welcome to MovieGo! Your Registration is Successful', registrationEmailHtml);
@@ -91,7 +102,7 @@ exports.register = async (req, res) => {
       console.error('Error sending registration email:', emailErr);
     }
 
-    // Send response
+    // Return success response
     res.json({
       token,
       id: userDetails.id,
@@ -102,7 +113,7 @@ exports.register = async (req, res) => {
     });
 
   } catch (err) {
-    console.error(err);
+    console.error('Registration error:', err);
     res.status(500).json({ error: 'Registration failed. Please try again later.' });
   }
 };
