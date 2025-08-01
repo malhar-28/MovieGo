@@ -6,7 +6,7 @@ const jwt = require('jsonwebtoken');
 const moment = require('moment');
 const QRCode = require('qrcode');
 const { sendEmail } = require('../utils/emailService');
-
+const { generateTransactionCode } = require('../utils/codeGenerator');
 // Helper function to extract user_id from token (Retained and necessary for new functionality)
 const getUserIdFromToken = (req) => {
     const authHeader = req.headers.authorization;
@@ -117,106 +117,85 @@ const getBookingDetails = async (bookingId, connection) => {
 
 
 // Helper to generate HTML content for the booking confirmation email
+
+
 const generateEmailContent = async (bookingDetails) => {
   if (!bookingDetails) {
     return '<h1>Booking Confirmation</h1><p>Details not available.</p>';
   }
 
-  // Safely extract seat labels
   let seatLabels = [];
   try {
-    if (Array.isArray(bookingDetails.booked_seats_details)) {
-      seatLabels = bookingDetails.booked_seats_details.map(seat =>
-        typeof seat === 'object' && seat !== null
-          ? seat.seat_label || ''
-          : seat
-      );
-    } else if (typeof bookingDetails.booked_seats_details === 'string') {
-      const parsed = JSON.parse(bookingDetails.booked_seats_details);
-      seatLabels = Array.isArray(parsed)
-        ? parsed.map(seat =>
-            typeof seat === 'object' && seat !== null
-              ? seat.seat_label || ''
-              : seat
-          )
-        : [];
-    }
+    const seatData = typeof bookingDetails.booked_seats_details === 'string'
+      ? JSON.parse(bookingDetails.booked_seats_details)
+      : bookingDetails.booked_seats_details;
+
+    seatLabels = Array.isArray(seatData)
+      ? seatData.map(seat =>
+          typeof seat === 'object' && seat !== null
+            ? seat.seat_label || ''
+            : seat
+        )
+      : [];
+
   } catch (err) {
-    console.error('Error parsing seat labels:', err);
+    console.error('Error parsing seats:', err);
   }
 
-  // Filter out empty strings or nulls
   seatLabels = seatLabels.filter(label => typeof label === 'string' && label.trim() !== '');
 
-  console.log("✅ Extracted seatLabels for email:", seatLabels);
-
-  // Format date and time properly
-  const showDate = bookingDetails.show_date;
-  const showTime = bookingDetails.show_time;
-  const formattedDate = moment(showDate, 'YYYY-MM-DD').format('ddd, D MMM YYYY');
-  const formattedTime = moment(showTime, ['HH:mm:ss', 'HH:mm']).isValid()
-    ? moment(showTime, ['HH:mm:ss', 'HH:mm']).format('HH:mm') + ' WIB'
-    : 'Invalid Time';
-
-  // Poster & QR details
+  const formattedDate = moment(bookingDetails.show_date).format('ddd DD MMM YYYY');
+  const formattedTime = moment(bookingDetails.show_time, ['HH:mm:ss', 'HH:mm']).format('HH:mm') + ' WIB';
+  const transactionCode = bookingDetails.transaction_code || 'N/A';
+  const qrBase64 = bookingDetails.qr_code || '';
   const posterUrl = `http://localhost:5000/MovieImages/${bookingDetails.poster_image || 'placeholder.jpg'}`;
-  const transactionCode = bookingDetails.booking_id?.toString().slice(-6) || 'N/A';
-  const qrValue = JSON.stringify({ bookingId: bookingDetails.booking_id, transactionCode });
-
-  let qrBase64 = '';
-  try {
-    qrBase64 = await QRCode.toDataURL(qrValue, { width: 100 });
-  } catch (err) {
-    console.error('QR Code generation failed:', err);
-  }
 
   return `
-  <div style="max-width:600px;margin:auto;background-color:#f9f9f9;border-radius:12px;font-family:Inter,sans-serif;overflow:hidden;border:1px solid #ddd;">
-    <div style="background-color:#0B193F;color:white;padding:20px;text-align:center;">
-      <h2 style="margin:0;">Your Ticket</h2>
-    </div>
-
-    <div style="padding:20px;background-color:white;">
-      <div style="display:flex;align-items:flex-start;margin-bottom:16px;">
-        <img src="${posterUrl}" alt="${bookingDetails.movie_title}" style="width:60px;height:80px;object-fit:cover;border-radius:8px;margin-right:12px;" onerror="this.onerror=null;this.src='https://via.placeholder.com/60x80?text=No+Poster';" />
-        <div>
-          <p style="color:#3b82f6;font-size:12px;margin:0 0 6px;"><strong>Order ID:</strong> ${bookingDetails.booking_id}</p>
-          <h3 style="margin:0 0 4px;color:#1f2937;">${bookingDetails.movie_title}</h3>
-          <p style="margin:0;color:#6b7280;">${bookingDetails.cinema_name} • ${bookingDetails.screen_name}</p>
-        </div>
+    <div style="max-width:600px;margin:auto;background:#fff;border-radius:12px;font-family:Inter,sans-serif;overflow:hidden;border:1px solid #ddd;">
+      <div style="background:#0B193F;color:white;padding:20px;text-align:center;">
+        <h2 style="margin:0;">Your Movie Ticket</h2>
       </div>
 
-      <hr style="border:none;border-top:1px dashed #ccc;margin:16px 0;" />
-
-      <table style="width:100%;font-size:14px;margin-bottom:16px;">
-        <tr>
-          <td><strong>Schedule:</strong><br>${formattedDate}</td>
-          <td><strong>Time:</strong><br>${formattedTime}</td>
-        </tr>
-        <tr>
-          <td style="padding-top:12px;"><strong>Seats:</strong><br>
-            ${seatLabels.map(s => `<span style="display:inline-block;margin:2px;padding:4px 8px;background-color:#0B193F;color:white;border-radius:4px;font-size:12px;">${s}</span>`).join('')}
-          </td>
-          <td style="padding-top:12px;"><strong>Total Seats:</strong><br>${seatLabels.length}</td>
-        </tr>
-      </table>
-
-      <hr style="border:none;border-top:1px dashed #ccc;margin:16px 0;" />
-
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-        <div>
-          <p style="color:#6b7280;font-size:12px;margin:0;">Transaction Code</p>
-          <h2 style="margin:4px 0;color:#1f2937;letter-spacing:2px;">${transactionCode}</h2>
+      <div style="padding:20px;">
+        <div style="display:flex;align-items:flex-start;margin-bottom:16px;">
+          <img src="${posterUrl}" alt="Poster" style="width:60px;height:80px;object-fit:cover;border-radius:8px;margin-right:12px;" />
+          <div>
+            <p style="margin:0;color:#3b82f6;font-size:12px;"><strong>Order ID:</strong> ${bookingDetails.booking_id}</p>
+            <h3 style="margin:4px 0 0;color:#1f2937;">${bookingDetails.movie_title}</h3>
+            <p style="margin:0;color:#6b7280;">${bookingDetails.cinema_name} • ${bookingDetails.screen_name}</p>
+          </div>
         </div>
-        <div>
-          <p style="color:#6b7280;font-size:12px;margin:0 0 4px;">QR Code</p>
-          <img src="${qrBase64}" alt="QR Code" style="width:60px;height:60px;border:1px solid #ccc;padding:4px;border-radius:4px;background:white;" />
+
+        <hr style="border:none;border-top:1px dashed #ccc;margin:16px 0;" />
+
+        <table style="width:100%;font-size:14px;">
+          <tr>
+            <td><strong>Date:</strong><br>${formattedDate}</td>
+            <td><strong>Time:</strong><br>${formattedTime}</td>
+          </tr>
+          <tr>
+            <td colspan="2" style="padding-top:12px;"><strong>Seats:</strong><br>
+              ${seatLabels.map(label => `<span style="margin:2px;padding:4px 8px;background:#0B193F;color:#fff;border-radius:4px;font-size:12px;">${label}</span>`).join('')}
+            </td>
+          </tr>
+        </table>
+
+        <hr style="border:none;border-top:1px dashed #ccc;margin:16px 0;" />
+
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <div>
+            <p style="color:#6b7280;font-size:12px;margin:0;">Transaction Code</p>
+            <h2 style="margin:4px 0;color:#1f2937;letter-spacing:2px;">${transactionCode}</h2>
+          </div>
+          <div>
+            <p style="color:#6b7280;font-size:12px;margin:0 0 4px;">QR Code</p>
+            <img src="${qrBase64}" alt="QR" style="width:60px;height:60px;border:1px solid #ccc;padding:4px;border-radius:4px;background:white;" />
+          </div>
         </div>
+
+        <p style="text-align:center;margin-top:20px;color:#777;font-size:13px;">Thanks for booking with <strong>MovieGo</strong>!</p>
       </div>
-
-      <p style="text-align:center;margin-top:20px;color:#777;font-size:13px;">Thank you for booking with <strong>MovieGo</strong>!</p>
     </div>
-  </div>
   `;
 };
 
@@ -225,83 +204,105 @@ const generateEmailContent = async (bookingDetails) => {
 
 
 
-
-
-
 // User: Create a new booking
+
 exports.createBooking = async (req, res) => {
-    let connection;
-    try {
-        connection = await pool.getConnection();
-        await connection.beginTransaction();
-        const { showtime_id, seat_ids, payment_method } = req.body;
-        const user_id = req.user.id;
-        const create_user = req.user.email;
+  let connection;
 
-        const [userRows] = await connection.execute('SELECT email FROM tbl_user WHERE id = ?', [user_id]);
-        const userEmail = userRows[0]?.email;
+  try {
+    const { showtime_id, seat_ids, payment_method } = req.body;
+    const user_id = req.user.id;
+    const create_user = req.user.email;
 
-        if (!showtime_id || !seat_ids || !Array.isArray(seat_ids) || seat_ids.length === 0 || !payment_method) {
-            return res.status(400).json({ message: 'Showtime ID, selected seat IDs (array), and payment method are required.' });
-        }
-
-        const [availableSeatsRows] = await connection.execute('CALL GetAvailableSeatsForShowtime(?)', [showtime_id]);
-        const availableSeats = availableSeatsRows[0].map(seat => seat.seat_id);
-        for (const selectedSeatId of seat_ids) {
-            if (!availableSeats.includes(selectedSeatId)) {
-                await connection.rollback();
-                return res.status(409).json({ message: `Seat ID ${selectedSeatId} is not available or does not exist for this showtime.` });
-            }
-        }
-
-        const { totalAmount, discount, finalAmount } = await calculateAmounts(showtime_id, seat_ids);
-
-        const [result] = await connection.execute(
-            'CALL AddBooking(?, ?, ?, ?, ?, ?, ?, ?)',
-            [
-                user_id,
-                showtime_id,
-                JSON.stringify(seat_ids),
-                payment_method,
-                totalAmount,
-                discount,
-                finalAmount,
-                create_user
-            ]
-        );
-
-        const bookingId = result[0][0].booking_id;
-
-        // --- Email Sending Logic ---
-        try {
-            const bookingDetails = await getBookingDetails(bookingId, connection);
-            console.log('bookingDetails for email:', bookingDetails);
-            if (bookingDetails && userEmail) {
-                const emailHtmlContent = await generateEmailContent(bookingDetails);
-await sendEmail(userEmail, 'Your MovieGo Booking Confirmation', emailHtmlContent);
-                console.log(`Booking confirmation email sent to ${userEmail} for booking ID ${bookingId}`);
-            } else {
-                console.warn(`Could not send email for booking ${bookingId}: Booking details or user email missing.`);
-            }
-        } catch (emailError) {
-            console.error('Error sending booking confirmation email:', emailError);
-        }
-
-        await connection.commit();
-        res.status(201).json({ message: 'Booking created successfully', bookingId: bookingId });
-
-    } catch (err) {
-        if (connection) await connection.rollback();
-        console.error('Error creating booking:', err);
-        if (err.message.includes('One or more selected seats are already booked')) {
-            return res.status(409).json({ error: err.message });
-        }
-        res.status(500).json({ error: 'Failed to create booking: ' + err.message });
-    } finally {
-        if (connection) connection.release();
+    if (!showtime_id || !Array.isArray(seat_ids) || seat_ids.length === 0 || !payment_method) {
+      return res.status(400).json({ message: 'Showtime ID, seat IDs, and payment method are required.' });
     }
-};
 
+    // Step 1: Generate unique transaction code
+    const transaction_code = Math.floor(100000 + Math.random() * 900000).toString();
+
+    connection = await pool.getConnection();
+    await connection.beginTransaction();
+
+    // Step 2: Validate user
+    const [userRows] = await connection.execute('SELECT email FROM tbl_user WHERE id = ?', [user_id]);
+    const userEmail = userRows[0]?.email;
+
+    // Step 3: Validate seat availability
+    const [availableSeatsRows] = await connection.execute('CALL GetAvailableSeatsForShowtime(?)', [showtime_id]);
+    const availableSeats = availableSeatsRows[0].map(seat => seat.seat_id);
+
+    for (const seatId of seat_ids) {
+      if (!availableSeats.includes(seatId)) {
+        await connection.rollback();
+        return res.status(409).json({ message: `Seat ID ${seatId} is not available or already booked.` });
+      }
+    }
+
+    // Step 4: Calculate price
+    const { totalAmount, discount, finalAmount } = await calculateAmounts(showtime_id, seat_ids);
+
+    // Step 5: Temporary dummy qrCode, orderId not known yet
+    let qr_code = 'TEMP';
+
+    // Step 6: Call stored procedure
+    const [result] = await connection.execute(
+      'CALL AddBooking(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [
+        user_id,
+        showtime_id,
+        JSON.stringify(seat_ids),
+        payment_method,
+        totalAmount,
+        discount,
+        finalAmount,
+        create_user,
+        transaction_code,
+        qr_code
+      ]
+    );
+
+    const bookingId = result[0][0]?.booking_id;
+
+    // Step 7: Generate final QR code with real order ID
+    const qrValue = `${process.env.BASE_URL || 'http://localhost:5173'}/verify-ticket?orderId=${bookingId}&userId=${user_id}&transaction_code=${transaction_code}`;
+    const finalQRCode = await QRCode.toDataURL(qrValue);
+
+    // Step 8: Update QR code into the database
+    await connection.execute(
+      'UPDATE tbl_order_summary SET qr_code = ? WHERE booking_id = ?',
+      [finalQRCode, bookingId]
+    );
+
+    // Step 9: Email logic
+    try {
+      const bookingDetails = await getBookingDetails(bookingId, connection);
+      if (bookingDetails && userEmail) {
+        const emailHtmlContent = await generateEmailContent(bookingDetails);
+        await sendEmail(userEmail, 'Your MovieGo Booking Confirmation', emailHtmlContent);
+        console.log(`✅ Email sent to ${userEmail}`);
+      }
+    } catch (emailErr) {
+      console.error('Email error:', emailErr);
+    }
+
+    await connection.commit();
+
+    res.status(201).json({
+      message: 'Booking successful',
+      bookingId,
+      transaction_code,
+      qr_code: finalQRCode
+    });
+
+  } catch (err) {
+    if (connection) await connection.rollback();
+    console.error('❌ Error creating booking:', err);
+    res.status(500).json({ error: 'Booking failed: ' + err.message });
+  } finally {
+    if (connection) connection.release();
+  }
+};
 
 const getBookingDetailsForUserBookings = async (bookingId, connection) => {
     // This stored procedure should return all necessary details for the email,
@@ -890,6 +891,159 @@ exports.getBookingByOwnerIdAdmin = async (req, res) => {
   } catch (err) {
     console.error('Error fetching bookings by owner ID:', err);
     res.status(500).json({ error: 'Failed to retrieve bookings: ' + err.message });
+  } finally {
+    if (connection) connection.release();
+  }
+};
+exports.listTicket = async (req, res) => {
+  let connection;
+  try {
+    const user_id = req.user.id;
+
+    if (!user_id) {
+      return res.status(400).json({ message: 'User ID is required' });
+    }
+
+    connection = await pool.getConnection();
+    const [result] = await connection.execute('CALL GetBookingsByUserId(?)', [user_id]);
+
+    const bookings = result[0].map(booking => ({
+      ticket_id: booking.booking_id,
+      movie_poster: booking.poster_image,
+      movie_name: booking.movie_title,
+      cinema_name: booking.cinema_name,
+show_date: moment(booking.show_date).format('ddd DD MMM'),
+show_time: moment(booking.show_time, 'HH:mm:ss').format('HH:mm'),
+      booking_status: booking.booking_status
+    }));
+
+    res.json(bookings);
+  } catch (err) {
+    console.error('Error fetching booking history:', err);
+    res.status(500).json({ error: 'Failed to fetch booking history: ' + err.message });
+  } finally {
+    if (connection) connection.release();
+  }
+};
+
+
+
+
+exports.listUpcoming = async (req, res) => {
+  try {
+    const user_id = req.user.id;
+    const [results] = await pool.execute('CALL GetBookingsByUserId(?)', [user_id]);
+
+    const currentTime = moment();
+    const upcoming = [];
+
+    results[0].forEach(booking => {
+      // ✅ Only process bookings that are still "Booked"
+      if (booking.booking_status !== 'Booked') return;
+
+      const showDate = moment(booking.show_date);
+      const showTime = moment(booking.show_time, 'HH:mm:ss');
+
+      const showDateTime = showDate.clone().set({
+        hour: showTime.get('hour'),
+        minute: showTime.get('minute'),
+        second: showTime.get('second')
+      });
+
+      if (showDateTime.isAfter(currentTime)) {
+        upcoming.push({
+          ticket_id: booking.booking_id,
+          movie_name: booking.movie_title,
+          cinema_name: booking.cinema_name,
+          show_date: showDate.format('ddd DD MMM'),         // e.g. Mon 12 Apr
+          show_time: showTime.format('HH:mm'),              // e.g. 13:45
+          movie_poster: booking.poster_image,
+          booking_status: booking.booking_status,
+          transaction_code: booking.transaction_code || '',
+          qr_code: booking.qr_code || ''
+        });
+      }
+    });
+
+    res.status(200).json(upcoming);
+  } catch (error) {
+    console.error('Error fetching upcoming bookings:', error);
+    res.status(500).json({ message: 'Internal Server Error' });
+  }
+};
+
+exports.verifyTicket = async (req, res) => {
+  const { orderId, userId, transaction_code } = req.query;
+
+  
+
+  let connection;
+  try {
+    connection = await pool.getConnection();
+    await connection.beginTransaction();
+
+    // 1. Get ticket data
+    const [rows] = await connection.execute(
+      `SELECT 
+        b.booking_id,
+        b.user_id,
+        b.booking_status,
+        m.title AS movie_title,
+        m.poster_image,
+        st.show_date,
+        st.show_time,
+        c.name AS cinema_name,
+        scr.screen_name,
+        os.transaction_code,
+        os.qr_code
+      FROM tbl_booking b
+      JOIN tbl_showtime st ON b.showtime_id = st.showtime_id
+      JOIN tbl_movie m ON st.movie_id = m.movie_id
+      JOIN tbl_screen scr ON st.screen_id = scr.screen_id
+      JOIN tbl_cinema c ON scr.cinema_id = c.cinema_id
+      JOIN tbl_order_summary os ON b.booking_id = os.booking_id
+      WHERE b.booking_id = ? AND b.user_id = ? AND os.transaction_code = ?`,
+      [orderId, userId, transaction_code]
+    );
+
+    if (rows.length === 0) {
+      await connection.rollback();
+      return res.status(404).json({ message: '❌ Ticket not found.' });
+    }
+
+    const ticket = rows[0];
+
+   
+    if (ticket.booking_status !== 'Booked') {
+      await connection.rollback();
+      return res.status(400).json({ message: `❌ Ticket not valid. Status: ${ticket.booking_status}` });
+    }
+
+    // 2. Mark as Used
+
+
+    return res.status(200).json({
+      message: '✅ Ticket verified and marked as used.',
+      verified: true,
+      ticket: {
+        booking_id: ticket.booking_id,
+        user_id: ticket.user_id,
+        movie_title: ticket.movie_title,
+        poster_image: ticket.poster_image,
+        cinema_name: ticket.cinema_name,
+        screen_name: ticket.screen_name,
+        show_date: moment(ticket.show_date).format('ddd, DD MMM YYYY'),
+        show_time: moment(ticket.show_time, 'HH:mm:ss').format('HH:mm'),
+        transaction_code: ticket.transaction_code,
+        qr_code: ticket.qr_code,
+        status: 'Used'
+      }
+    });
+
+  } catch (err) {
+    if (connection) await connection.rollback();
+    console.error('❌ QR verification error:', err);
+    res.status(500).json({ message: 'Internal Server Error' });
   } finally {
     if (connection) connection.release();
   }

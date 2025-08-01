@@ -22,5 +22,9 @@ router.get('/showtime-seats/:showtimeId', verifyAuth, bookingController.getShowt
 router.post('/get-by-cinema', verifyAuth, bookingController.getBookingByCinemaIdAdmin);
 
 router.post('/get-by-owner', verifyAuth, bookingController.getBookingByOwnerIdAdmin);
+router.get('/list-ticket', verifyAuth, bookingController.listTicket);
+router.get('/list-upcoming', verifyAuth, bookingController.listUpcoming);
+
+router.get('/verify-ticket', bookingController.verifyTicket);
 
 module.exports = router;

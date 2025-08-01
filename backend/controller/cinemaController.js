@@ -579,3 +579,76 @@ exports.getFilteredCinemasData = async (req, res) => {
     res.status(500).json({ error: 'Failed to retrieve filtered cinemas data: ' + err.message });
   }
 };
+
+
+
+exports.getCinemaDetailsWithMovies = async (req, res) => {
+    try {
+        const { cinema_id } = req.body;
+        if (!cinema_id) return res.status(400).json({ error: 'cinema_id is required' });
+
+        const [results] = await pool.query('CALL GetCinemaDetailsWithMovies(?)', [cinema_id]);
+
+        const cinemaInfo = results[0][0];
+        const movieShowRows = results[1];
+        const priceRows = results[2];
+
+        if (!cinemaInfo) {
+            return res.status(404).json({ error: 'Cinema not found' });
+        }
+
+        // Group seat prices by movie_id to find start price
+        const priceMap = {}; // movie_id => [prices]
+        priceRows.forEach(p => {
+            if (!priceMap[p.movie_id]) priceMap[p.movie_id] = [];
+            priceMap[p.movie_id].push(p.price);
+        });
+
+        // Group shows by movie_id
+        const movieMap = {};
+        movieShowRows.forEach(row => {
+            if (!movieMap[row.movie_id]) {
+                movieMap[row.movie_id] = {
+                    movie_id: row.movie_id,
+                    image: row.image,
+                    name: row.name,
+                    price: priceMap[row.movie_id]
+                        ? Math.min(...priceMap[row.movie_id])
+                        : null,
+                    shows: []
+                };
+            }
+
+            movieMap[row.movie_id].shows.push({
+                show_id: row.show_id,
+                time: row.time
+            });
+        });
+
+        const movies = Object.values(movieMap);
+
+        // Optional: compute start_price and duration (based on first movie)
+        const allPrices = Object.values(priceMap).flat();
+        const start_price = allPrices.length ? Math.min(...allPrices) : null;
+        const duration = movieShowRows.length > 0 ? movieShowRows[0].duration : null;
+
+        const response = {
+            cinema_id: cinemaInfo.cinema_id,
+            image: cinemaInfo.image,
+            name: cinemaInfo.name,
+            address: cinemaInfo.address,
+            distance: "1.0", // optional, if frontend passes
+            duration,
+            start_price,
+            rating: cinemaInfo.rating,
+            review_count: cinemaInfo.review_count,
+            movies
+        };
+
+        res.json(response);
+
+    } catch (err) {
+        console.error('Error fetching cinema details:', err);
+        res.status(500).json({ error: 'Failed to retrieve cinema details: ' + err.message });
+    }
+};

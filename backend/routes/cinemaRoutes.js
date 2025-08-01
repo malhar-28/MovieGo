@@ -37,5 +37,6 @@ router.post('/bulk-add', verifyAuth, upload.any(), cinemaController.bulkAddCinem
 // ✅ Added public filtered data route from Ver 1
 router.get('/filtered-cinemas-data', cinemaController.getFilteredCinemasData); // public
 
+router.post('/cinema-details', cinemaController.getCinemaDetailsWithMovies);
 module.exports = router;
 
