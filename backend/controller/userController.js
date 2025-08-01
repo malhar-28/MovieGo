@@ -109,7 +109,8 @@ exports.register = async (req, res) => {
       name: userDetails.name,
       email: userDetails.email,
       image: userDetails.image,
-      contact: userDetails.mobile
+      contact: userDetails.mobile,
+      city: userDetails.city
     });
 
   } catch (err) {
@@ -149,7 +150,8 @@ exports.login = async (req, res) => {
       name: userDetails.name,
       email: userDetails.email,
       image: userDetails.image,
-      contact: userDetails.mobile // assuming 'mobile' is the contact number
+      contact: userDetails.mobile ,// assuming 'mobile' is the contact number
+      city:userDetails.city
     });
 
   } catch (err) {
@@ -284,6 +286,30 @@ exports.updateUser = async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 };
+
+exports.changeCity = async (req, res) => {
+  try {
+    const { city } = req.body;
+    const id = req.user.id;
+    const update_user = req.user.email;
+
+    if (!city || typeof city !== 'string' || city.trim().length > 100) {
+      return res.status(400).json({ message: 'City must be a valid string (max 100 characters)' });
+    }
+
+    // Sanitize city input
+    const cleanCity = city.trim();
+
+    // Call stored procedure to update city
+    await pool.execute('CALL ChangeUserCity(?, ?, ?)', [id, cleanCity, update_user]);
+
+    res.json({ message: 'City updated successfully' });
+  } catch (err) {
+    console.error('Error in changeCity:', err);
+    res.status(500).json({ error: 'Failed to update city' });
+  }
+};
+
 exports.getUserById = async (req, res) => {
   try {
     const { id } = req.body;

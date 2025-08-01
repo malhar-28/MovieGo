@@ -24,7 +24,7 @@ router.put('/update', verifyAuth, upload.single('image'), userController.updateU
 router.put('/change-password', verifyAuth, userController.changePassword);
 router.post('/get-user', verifyAuth, userController.getUserById); // Changed to POST
 router.put('/toggle-status', verifyAuth, userController.toggleStatus); // ID will come in body
-
+router.put("/change-city", verifyAuth, userController.changeCity); // Change city
 router.post('/send-otp', userController.sendOtp);
 router.post('/reset-password-with-otp', userController.resetPasswordWithOtp);
 

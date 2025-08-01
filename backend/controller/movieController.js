@@ -381,3 +381,78 @@ exports.getUpcomingMovies = async (req, res) => {
         res.status(500).json({ error: 'Failed to retrieve upcoming movies: ' + err.message });
     }
 };
+
+
+
+exports.getMovieDetailsWithCinemas = async (req, res) => {
+    try {
+        const { movieId } = req.body;
+        if (!movieId) {
+            return res.status(400).json({ error: 'movieId is required' });
+        }
+
+        const [results] = await pool.query('CALL GetMovieDetailsWithCinemas(?)', [movieId]);
+
+        const movieDetails = results[0];
+        const cinemas = results[1];
+        const seatPrices = results[2];
+
+        if (!movieDetails || movieDetails.length === 0) {
+            return res.status(404).json({ error: 'Movie not found' });
+        }
+
+        const movie = movieDetails[0];
+        const cinemaMap = {};
+
+        // Group seat prices by showtime_id
+        const priceMap = {};
+        seatPrices.forEach(p => {
+            if (!priceMap[p.showtime_id]) {
+                priceMap[p.showtime_id] = [];
+            }
+            priceMap[p.showtime_id].push({
+                seat_type: p.seat_type,
+                price: p.price
+            });
+        });
+
+        // Group cinemas and showtimes
+        cinemas.forEach(row => {
+            if (!cinemaMap[row.cinema_id]) {
+                cinemaMap[row.cinema_id] = {
+                    cinema_id: row.cinema_id,
+                    name: row.name,
+                    address: row.address,
+                    cinema_movie_price: "", // still here for response format
+                    city: row.city,
+                    state: row.state,
+                    zip_code: row.zip_code,
+                    longitude: row.longitude,
+                    latitude: row.latitude,
+                    duration: row.duration,
+                    image: row.image,
+                    status: row.status,
+                    avg_rating: row.avg_rating,
+                    total_reviews: row.total_reviews,
+                    owner_id: row.owner_id,
+                    manager_email: row.manager_email,
+                    owner_name: row.owner_name,
+                    showTime: []
+                };
+            }
+
+            cinemaMap[row.cinema_id].showTime.push({
+                showTimeId: row.showTimeId,
+                time: row.time,
+                prices: priceMap[row.showTimeId] || []
+            });
+        });
+
+        movie.cinema = Object.values(cinemaMap);
+        res.json(movie);
+
+    } catch (err) {
+        console.error('Error fetching movie details:', err);
+        res.status(500).json({ error: 'Failed to retrieve movie details: ' + err.message });
+    }
+};

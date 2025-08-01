@@ -87,5 +87,5 @@ router.get('/upcoming', movieController.getUpcomingMovies);
 
 // ✅ Public: Get a single public movie by ID
 router.post('/get-public-movie', movieController.getMovieById);
-
+router.post('/getMovieDetails', movieController.getMovieDetailsWithCinemas);
 module.exports = router;
